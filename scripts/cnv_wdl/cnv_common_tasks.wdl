@@ -282,6 +282,7 @@ task CollectAllelicCounts {
 task ScatterIntervals {
     File interval_list
     Int num_intervals_per_scatter
+    File? gatk4_jar_override
 
     # Runtime parameters
     String gatk_docker
@@ -292,11 +293,21 @@ task ScatterIntervals {
     Int? preemptible_attempts
 
     Int machine_mem_mb = select_first([mem_gb, 2]) * 1000
+    Int command_mem_mb = machine_mem_mb - 500
 
     String base_filename = basename(interval_list, ".interval_list")
 
     command <<<
         set -e
+
+        export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
+
+        gatk --java-options "-Xmx${command_mem_mb}m" IntervalListTools \
+            -L ${common_sites} \
+            --input ${bam} \
+            --reference ${ref_fasta} \
+            --minimum-base-quality ${default="20" minimum_base_quality} \
+            --output ${allelic_counts_filename}
 
         grep @ ${interval_list} > header.txt
         grep -v @ ${interval_list} > all_intervals.txt
