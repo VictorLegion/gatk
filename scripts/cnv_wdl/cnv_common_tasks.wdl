@@ -282,6 +282,7 @@ task CollectAllelicCounts {
 task ScatterIntervals {
     File interval_list
     Int num_intervals_per_scatter
+    String? output_dir
     File? gatk4_jar_override
 
     # Runtime parameters
@@ -295,24 +296,27 @@ task ScatterIntervals {
     Int machine_mem_mb = select_first([mem_gb, 2]) * 1000
     Int command_mem_mb = machine_mem_mb - 500
 
+    # If optional output_dir not specified, use "out"
+    String output_dir_ = select_first([output_dir, "out"])
+
     String base_filename = basename(interval_list, ".interval_list")
 
     command <<<
         set -e
-
+        mkdir ${output_dir_}
         export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
 
         gatk --java-options "-Xmx${command_mem_mb}m" IntervalListTools \
-            -L ${common_sites} \
-            --input ${bam} \
-            --reference ${ref_fasta} \
-            --minimum-base-quality ${default="20" minimum_base_quality} \
-            --output ${allelic_counts_filename}
+            --INPUT ${interval_list} \
+            --SUBDIVISION_MODE INTERVAL_COUNT \
+            --SCATTER_CONTENT ${num_intervals_per_scatter} \
+            --OUTPUT ${output_dir_}
 
-        grep @ ${interval_list} > header.txt
-        grep -v @ ${interval_list} > all_intervals.txt
-        split -l ${num_intervals_per_scatter} --numeric-suffixes all_intervals.txt ${base_filename}.scattered.
-        for i in ${base_filename}.scattered.*; do cat header.txt $i > $i.interval_list; done
+        # output files are named output_dir_/temp_0001_of_N/scattered.interval_list, etc. (N = num_intervals_per_scatter);
+        # we rename them as output_dir_/base_filename.scattered.0000.interval_list, etc.
+        ls ${output_dir_}/*/scattered.interval_list | \
+            cat -n | \
+            while read n filename; do mv $filename ${output_dir_}/${base_filename}.scattered.$(printf "%04d" $n).interval_list; done
     >>>
 
     runtime {
@@ -324,7 +328,7 @@ task ScatterIntervals {
     }
 
     output {
-        Array[File] scattered_interval_lists = glob("${base_filename}.scattered.*.interval_list")
+        Array[File] scattered_interval_lists = glob("${output_dir_}/${base_filename}.scattered.*.interval_list")
     }
 }
 
