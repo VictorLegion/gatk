@@ -296,14 +296,14 @@ task ScatterIntervals {
     Int machine_mem_mb = select_first([mem_gb, 2]) * 1000
     Int command_mem_mb = machine_mem_mb - 500
 
-    # If optional output_dir not specified, use "out"
+    # If optional output_dir not specified, use "out";
+    # IntervalListTools will create this directory
     String output_dir_ = select_first([output_dir, "out"])
 
     String base_filename = basename(interval_list, ".interval_list")
 
     command <<<
         set -e
-        mkdir ${output_dir_}
         export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
 
         gatk --java-options "-Xmx${command_mem_mb}m" IntervalListTools \
