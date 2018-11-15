@@ -307,6 +307,7 @@ task ScatterIntervals {
         export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
         
         {
+            echo "Attempting to run IntervalListTools..."
             gatk --java-options "-Xmx${command_mem_mb}m" IntervalListTools \
                 --INPUT ${interval_list} \
                 --SUBDIVISION_MODE INTERVAL_COUNT \
@@ -319,6 +320,7 @@ task ScatterIntervals {
                 while read n filename; do mv $filename ${output_dir_}/${base_filename}.scattered.$(printf "%04d" $n).interval_list; done
         } || {
             # if only a single shard is required, then we can just rename the original interval list
+            echo "IntervalListTools failed because only a single shard is required. Copying original interval list..."
             cp ${interval_list} ${output_dir_}/${base_filename}.scattered.1.interval_list
         }
     >>>
