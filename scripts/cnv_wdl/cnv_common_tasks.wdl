@@ -297,32 +297,30 @@ task ScatterIntervals {
     Int command_mem_mb = machine_mem_mb - 500
 
     # If optional output_dir not specified, use "out";
-    # IntervalListTools will create this directory
     String output_dir_ = select_first([output_dir, "out"])
 
     String base_filename = basename(interval_list, ".interval_list")
 
     command <<<
         set -e
+        mkdir ${output_dir_}
         export GATK_LOCAL_JAR=${default="/root/gatk.jar" gatk4_jar_override}
-
-        gatk --java-options "-Xmx${command_mem_mb}m" IntervalListTools \
-            --INPUT ${interval_list} \
-            --SUBDIVISION_MODE INTERVAL_COUNT \
-            --SCATTER_CONTENT ${num_intervals_per_scatter} \
-            --OUTPUT ${output_dir_}
-
-        if [[ -f ${output_dir_} ]]; then
-            # if only a single shard is required, then output_dir_ will be a file (not a directory);
-            # in this case, we can just rename the original interval list
-            cp ${interval_list} ${output_dir_}/${base_filename}.scattered.1.interval_list
-        else
-            # otherwise, output files are named output_dir_/temp_0001_of_N/scattered.interval_list, etc. (N = num_intervals_per_scatter);
+        
+        {
+            gatk --java-options "-Xmx${command_mem_mb}m" IntervalListTools \
+                --INPUT ${interval_list} \
+                --SUBDIVISION_MODE INTERVAL_COUNT \
+                --SCATTER_CONTENT ${num_intervals_per_scatter} \
+                --OUTPUT ${output_dir_} &&
+            # output files are named output_dir_/temp_0001_of_N/scattered.interval_list, etc. (N = num_intervals_per_scatter);
             # we rename them as output_dir_/base_filename.scattered.0000.interval_list, etc.
             ls ${output_dir_}/*/scattered.interval_list | \
                 cat -n | \
                 while read n filename; do mv $filename ${output_dir_}/${base_filename}.scattered.$(printf "%04d" $n).interval_list; done
-        fi
+        } || {
+            # if only a single shard is required, then we can just rename the original interval list
+            cp ${interval_list} ${output_dir_}/${base_filename}.scattered.1.interval_list
+        }
     >>>
 
     runtime {
@@ -402,6 +400,9 @@ task PostprocessGermlineCNVCalls {
             --sample-index ${sample_index} \
             --output-genotyped-intervals ${genotyped_intervals_vcf_filename} \
             --output-genotyped-segments ${genotyped_segments_vcf_filename}
+        
+        rm -r CALLS_*
+        rm -r MODEL_*
     >>>
 
     runtime {
