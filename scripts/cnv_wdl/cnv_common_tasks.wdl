@@ -400,7 +400,7 @@ task PostprocessGermlineCNVCalls {
             --sample-index ${sample_index} \
             --output-genotyped-intervals ${genotyped_intervals_vcf_filename} \
             --output-genotyped-segments ${genotyped_segments_vcf_filename}
-        
+
         rm -r CALLS_*
         rm -r MODEL_*
     >>>
